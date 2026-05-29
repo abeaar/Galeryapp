@@ -4,6 +4,7 @@ import PhotosUI
 struct GalleryView: View {
     @State private var viewModel = GalleryViewModel()
     
+    
     var body: some View {
         NavigationStack {
             VStack(spacing: 30) {
