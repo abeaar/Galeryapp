@@ -52,3 +52,7 @@ struct GalleryView: View {
         }
     }
 }
+
+#Preview {
+    GalleryView()
+}
