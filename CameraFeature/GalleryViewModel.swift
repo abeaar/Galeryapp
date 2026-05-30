@@ -1,27 +1,41 @@
 import SwiftUI
-import PhotosUI
+import Photos
+
+enum GalleryState {
+    case idle, loading, loaded, denied
+}
 
 @MainActor
-class GalleryViewModel: Observable {
-    var selectedItem: PhotosPickerItem? {
-        didSet {
-            Task { await loadImage() }
+@Observable
+class GalleryViewModel {
+    var assets: [PHAsset] = []
+    var state: GalleryState = .idle
+
+    func load() async {
+        state = .loading
+        let current = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        switch current {
+        case .authorized, .limited:
+            fetchAssets()
+        case .notDetermined:
+            let result = await PHPhotoLibrary.requestAuthorization(for: .readWrite)
+            if result == .authorized || result == .limited {
+                fetchAssets()
+            } else {
+                state = .denied
+            }
+        default:
+            state = .denied
         }
     }
-    
-    var selectedImage: UIImage?
-    var isLoading = false
-    
-    private func loadImage() async {
-        guard let item = selectedItem else { return }
-        
-        isLoading = true
-        defer { isLoading = false }
-        
-        // Load the image data from the picker
-        if let data = try? await item.loadTransferable(type: Data.self),
-           let uiImage = UIImage(data: data) {
-            self.selectedImage = uiImage
-        }
+
+    private func fetchAssets() {
+        let options = PHFetchOptions()
+        options.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        let result = PHAsset.fetchAssets(with: .image, options: options)
+        var fetched: [PHAsset] = []
+        result.enumerateObjects { asset, _, _ in fetched.append(asset) }
+        assets = fetched
+        state = .loaded
     }
 }
