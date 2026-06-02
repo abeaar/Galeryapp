@@ -2,99 +2,160 @@ import SwiftUI
 import Photos
 
 struct ContentView: View {
-    @State private var viewModel = GalleryViewModel()
     @Environment(\.dismiss) private var dismiss
-
+    @State private var viewModel = GalleryViewModel()
+    @GestureState private var dragOffset: CGFloat = 0
+    
+    private let swipeThreshold: CGFloat = 50
+    
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-
-            TabView(selection: $viewModel.currentIndex) {
-                ForEach(Array(viewModel.assets.enumerated()), id: \.offset) { index, asset in
-                    GalleryPageView(image: viewModel.fullImages[asset.localIdentifier])
-                        .tag(index)
+        NavigationStack {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                
+                content
+                    .offset(x: dragOffset)
+                    .gesture(
+                        DragGesture()
+                            .updating($dragOffset) { value, state, _ in
+                                state = value.translation.width
+                            }
+                            .onEnded { value in
+                                handleSwipe(value.translation.width)
+                            }
+                    )
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "chevron.left")
+                            .font(.title3.weight(.regular))
+                    }
+                }
+                
+                ToolbarItem(placement: .principal) {
+                    VStack {
+                        Text ("Challenge 3")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal,30)
+                        Text("00:00")
+                            .font(.caption)
+                            .foregroundStyle(.white.secondary)
+                    }
+                    .frame(width: 200, height: 44)
+                    .glassEffect(.regular.interactive(), in: Capsule())
+                }
+                
+                
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {} label: {
+                        Image(systemName: "ellipsis")
+                            .fontWeight(.semibold)
+                    }
+                }
+                
+                ToolbarItem(placement: .bottomBar) {
+                    Button {} label: {
+                        Image(systemName: "square.and.arrow.up")
+                    }
+                }
+                
+                ToolbarItem(placement: .bottomBar) {
+                    Spacer()
+                }
+                
+                ToolbarItem(placement: .bottomBar) {
+                    Button {} label: {
+                        Image(systemName: "heart")
+                    }
+                }
+                
+                ToolbarItem(placement: .bottomBar) {
+                    Button {} label: {
+                        Image(systemName: "info.circle")
+                    }
+                }
+                
+                ToolbarItem(placement: .bottomBar) {
+                    Button {} label: {
+                        Image(systemName: "line.3.horizontal")
+                    }
+                }
+                
+                ToolbarItem(placement: .bottomBar) {
+                    Spacer()
+                }
+                
+                ToolbarItem(placement: .bottomBar) {
+                    Button {} label: {
+                        Image(systemName: "trash")
+                    }
                 }
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .ignoresSafeArea()
-            .task(id: viewModel.currentIndex) {
-                guard viewModel.assets.indices.contains(viewModel.currentIndex) else { return }
-                await viewModel.loadImage(for: viewModel.assets[viewModel.currentIndex])
+        }.navigationBarBackButtonHidden(true)
+            .task {
+                await viewModel.load()
             }
-        }
-        .safeAreaInset(edge: .bottom) {
-            thumbnailStrip
-        }
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button(action: { dismiss() }) {
-                    Image(systemName: "chevron.left")
-                        .font(.title2.weight(.medium))
+            .onChange(of: viewModel.currentAsset?.localIdentifier) { _, newId in
+                guard let id = newId,
+                      let asset = viewModel.currentAsset else { return }
+                if viewModel.fullImages[id] == nil {
+                    Task { await viewModel.loadImage(for: asset) }
                 }
             }
-            ToolbarItem(placement: .principal) {
-                VStack(spacing: 2) {
-                    Text(viewModel.headerTitle)
-                        .font(.headline)
-                    Text(viewModel.headerSubtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+    }
+    
+    private func handleSwipe(_ translation: CGFloat) {
+        guard !viewModel.assets.isEmpty else { return }
+        if translation > swipeThreshold {
+            if viewModel.currentIndex > 0 {
+                viewModel.currentIndex -= 1
             }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button(action: {}) {
-                    Image(systemName: "ellipsis")
-                }
-            }
-            ToolbarItemGroup(placement: .bottomBar) {
-                Button(action: {}) { Image(systemName: "square.and.arrow.up") }
-                Spacer()
-                HStack () {
-                    Button(action: {}) { Image(systemName: "heart") }
-                    Button(action: {}) { Image(systemName: "info.circle") }
-                    Button(action: {}) { Image(systemName: "line.3.horizontal") }
-                }
-                Spacer()
-                Button(action: {}) { Image(systemName: "trash") }
-            }
-        }
-        .navigationBarBackButtonHidden(true)
-        .toolbarBackground(.hidden, for: .navigationBar)
-        .toolbarBackground(.hidden, for: .bottomBar)
-        .toolbarColorScheme(.dark, for: .navigationBar, .bottomBar)
-        .tint(.white)
-        .task {
-            await viewModel.load()
-            for asset in viewModel.assets {
-                await viewModel.loadThumbnail(for: asset)
+        } else if translation < -swipeThreshold {
+            if viewModel.currentIndex < viewModel.assets.count - 1 {
+                viewModel.currentIndex += 1
             }
         }
     }
-
-    var thumbnailStrip: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 2) {
-                    ForEach(Array(viewModel.assets.enumerated()), id: \.offset) { index, asset in
-                        ThumbnailView(image: viewModel.thumbnails[asset.localIdentifier], isSelected: index == viewModel.currentIndex)
-                            .id(index)
-                            .onTapGesture {
-                                withAnimation { viewModel.currentIndex = index }
-                            }
-                    }
-                }
-                .padding(.horizontal, 25)
+    
+    @ViewBuilder
+    private var content: some View {
+        switch viewModel.state {
+        case .idle, .loading:
+            ProgressView()
+                .tint(.white)
+        case .denied:
+            placeholder(systemImage: "photo.on.rectangle.angled", message: "Photo access denied")
+        case .loaded:
+            if let asset = viewModel.currentAsset,
+               let image = viewModel.fullImages[asset.localIdentifier] {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else if viewModel.assets.isEmpty {
+                placeholder(systemImage: "photo.on.rectangle.angled", message: "No photos")
+            } else {
+                ProgressView()
+                    .tint(.white)
             }
-            .frame(height: 60)
-            .onChange(of: viewModel.currentIndex) { _, newValue in
-                withAnimation { proxy.scrollTo(newValue, anchor: .center) }
-            }
+        }
+    }
+    
+    private func placeholder(systemImage: String, message: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: systemImage)
+                .font(.system(size: 48, weight: .light))
+                .foregroundStyle(.white.secondary)
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.white.secondary)
         }
     }
 }
 
 #Preview {
-    NavigationStack {
-        ContentView()
-    }
+    ContentView()
 }
