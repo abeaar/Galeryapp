@@ -2,41 +2,27 @@ import SwiftUI
 import Photos
 
 struct ContentView: View {
+    @Environment(\.dismiss) private var dismiss
     @State private var viewModel = GalleryViewModel()
 
-
     var body: some View {
-        // ZStack: Handles depth
-        ZStack {
-            Color.black.ignoresSafeArea()
-            
-            TabView(selection: $viewModel.currentIndex) {
-                ForEach(Array(viewModel.assets.enumerated()), id: \.offset) { index, asset in
-                    GalleryPageView(image: viewModel.fullImages[asset.localIdentifier])
-                        .tag(index)
-                }
+        NavigationStack {
+            ZStack {
+                Color.black.ignoresSafeArea()
+                content
             }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .ignoresSafeArea()
-            .task(id: viewModel.currentIndex) {
-                guard viewModel.assets.indices.contains(viewModel.currentIndex) else { return }
-                await viewModel.loadImage(for: viewModel.assets[viewModel.currentIndex])
-            }
-            
-            VStack(spacing: 0) {
-                HStack {
-                    Button(action: {}) {
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: { dismiss() }) {
                         Image(systemName: "chevron.left")
-                            .frame(width: 44, height: 44)
-                            .font(.title2.weight(.medium))
+                            .font(.title3.weight(.regular))
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Back")
-                    .glassEffect(.regular.interactive(), in: Circle())
-                    
-                    Spacer()
-                    
-                    VStack(spacing: 2) {
+                }
+
+                ToolbarItem(placement: .principal) {
+                    VStack {
                         Text(viewModel.headerTitle)
                             .font(.headline)
                             .foregroundStyle(.white)
@@ -47,85 +33,82 @@ struct ContentView: View {
                     }
                     .frame(width: 200, height: 44)
                     .glassEffect(.regular.interactive(), in: Capsule())
-                    
-                    Spacer()
-                    
-                    Button(action: {}) {
+                }
+
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {} label: {
                         Image(systemName: "ellipsis")
-                            .frame(width: 44, height: 44)
+                            .fontWeight(.semibold)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("More")
-                    .glassEffect(.regular.interactive(), in: Capsule())
                 }
-                .padding(.horizontal, 25)
-                
-                Spacer()
-                
-                // --- BOTTOM AREA ---
-                VStack {
-                    ScrollViewReader { proxy in
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 2) {
-                                ForEach(Array(viewModel.assets.enumerated()), id: \.offset) { index, asset in
-                                    ThumbnailView(image: viewModel.thumbnails[asset.localIdentifier], isSelected: index == viewModel.currentIndex)
-                                        .id(index)
-                                        .onTapGesture {
-                                            withAnimation { viewModel.currentIndex = index }
-                                        }
-                                }
-                            }
-                            .padding(.horizontal, 25)
-                        }
-                        .frame(height: 60)
-                        .onChange(of: viewModel.currentIndex) { _, newValue in
-                            withAnimation { proxy.scrollTo(newValue, anchor: .center) }
-                        }
+
+                ToolbarItem(placement: .bottomBar) {
+                    Button {} label: {
+                        Image(systemName: "square.and.arrow.up")
                     }
-                    
-                    // Action Toolbar
-                    HStack {
-                        Button(action: {}) {
-                            Image(systemName: "square.and.arrow.up")
-                                .font(.title2.weight(.medium))
-                        }
-                        .frame(width: 44, height: 44)
-                        .buttonStyle(.plain)
-                        .glassEffect(.regular.interactive(), in: Circle())
-                        
-                        Spacer()
-                        HStack(spacing: 40) {
-                            Button(action: {}) { Image(systemName: "heart") }
-                                .buttonStyle(.plain)
-                            Button(action: {}) { Image(systemName: "info.circle") }
-                                .buttonStyle(.plain)
-                            Button(action: {}) { Image(systemName: "line.3.horizontal") }
-                                .buttonStyle(.plain)
-                        }
-                        .font(.title2.weight(.medium))
-                        .padding(.horizontal, 15)
-                        .frame(height: 44)
-                        .glassEffect(.regular.interactive(), in: Capsule())
-                        
-                        Spacer()
-                        
-                        Button(action: {}) {
-                            Image(systemName: "trash")
-                                .frame(width: 44, height: 44)
-                        }
-                        .buttonStyle(.plain)
-                        .font(.title2.weight(.medium))
-                        .glassEffect(.regular.interactive(), in: Circle())
-                    }
-                    .padding(.horizontal, 25)
                 }
+
+                ToolbarItem(placement: .bottomBar) {
+                    Spacer()
+                }
+
+                ToolbarItem(placement: .bottomBar) {
+                    Button {} label: {
+                        Image(systemName: "heart")
+                    }
+                }
+
+                ToolbarItem(placement: .bottomBar) {
+                    Button {} label: {
+                        Image(systemName: "info.circle")
+                    }
+                }
+
+                ToolbarItem(placement: .bottomBar) {
+                    Button {} label: {
+                        Image(systemName: "line.3.horizontal")
+                    }
+                }
+
+                ToolbarItem(placement: .bottomBar) {
+                    Spacer()
+                }
+
+                ToolbarItem(placement: .bottomBar) {
+                    Button {} label: {
+                        Image(systemName: "trash")
+                    }
+                }
+            }
+        }.navigationBarBackButtonHidden(true)
+            .task {
+                await viewModel.load()
+                loadImage(at: viewModel.currentIndex)
+            }
+            .onChange(of: viewModel.currentIndex) { _, newIndex in
+                viewModel.prefetchNextPageIfNeeded(currentIndex: newIndex)
+                loadImage(at: newIndex)
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        @Bindable var viewModel = viewModel
+        TabView(selection: $viewModel.currentIndex) {
+            ForEach(0..<viewModel.loadedCount, id: \.self) { index in
+                GalleryPageView(image: viewModel.fullImages[viewModel.assets[index].localIdentifier])
+                    .tag(index)
             }
         }
-        .task {
-            await viewModel.load()
-            for asset in viewModel.assets {
-                await viewModel.loadThumbnail(for: asset)
-            }
+        .tabViewStyle(.page(indexDisplayMode: .never))
+        .ignoresSafeArea()
+    }
+
+    private func loadImage(at index: Int) {
+        guard viewModel.assets.indices.contains(index) else { return }
+        let asset = viewModel.assets[index]
+        if viewModel.fullImages[asset.localIdentifier] == nil {
+            Task { await viewModel.loadImage(for: asset) }
         }
     }
 }

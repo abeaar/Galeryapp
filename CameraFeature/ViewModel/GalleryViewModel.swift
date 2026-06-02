@@ -1,14 +1,22 @@
 import SwiftUI
 import Photos
 
+enum GalleryState {
+    case idle, loading, loaded, denied
+}
+
+
 @Observable
 class GalleryViewModel {
     var assets: [PHAsset] = []
+    var loadedCount: Int = 0
     var state: GalleryState = .idle
     var fullImages: [String: UIImage] = [:]
     var thumbnails: [String: UIImage] = [:]
-  
-    
+
+    private let pageSize: Int = 50
+    private let prefetchThreshold: Int = 10
+
     func load() async {
         state = .loading
         let current = PHPhotoLibrary.authorizationStatus(for: .readWrite)
@@ -34,7 +42,16 @@ class GalleryViewModel {
         var fetched: [PHAsset] = []
         result.enumerateObjects { asset, _, _ in fetched.append(asset) }
         assets = fetched
+        loadedCount = min(pageSize, fetched.count)
         state = .loaded
+    }
+
+    func prefetchNextPageIfNeeded(currentIndex: Int) {
+        guard state == .loaded else { return }
+        guard loadedCount < assets.count else { return }
+        if currentIndex >= loadedCount - prefetchThreshold {
+            loadedCount = min(loadedCount + pageSize, assets.count)
+        }
     }
     func loadImage(for asset: PHAsset) async {
         let id = asset.localIdentifier
@@ -68,11 +85,13 @@ class GalleryViewModel {
     }
     
     var currentIndex: Int = 0
-    
+
     var currentAsset: PHAsset? {
         guard assets.indices.contains(currentIndex) else { return nil }
         return assets[currentIndex]
     }
+
+    var isDenied: Bool { state == .denied }
 
     var headerTitle: String {
         guard let date = currentAsset?.creationDate else { return "Photo" }
