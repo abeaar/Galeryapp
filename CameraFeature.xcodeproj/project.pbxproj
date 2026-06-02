@@ -6,8 +6,13 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		64FC26A12FCEA34E002CA438 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 64FC26A02FCEA34E002CA438 /* .gitignore */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		6413BEF12FC6D65100A0F8A4 /* CameraFeature.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CameraFeature.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		64FC26A02FCEA34E002CA438 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -32,6 +37,7 @@
 		6413BEE82FC6D65100A0F8A4 = {
 			isa = PBXGroup;
 			children = (
+				64FC26A02FCEA34E002CA438 /* .gitignore */,
 				6413BEF32FC6D65100A0F8A4 /* CameraFeature */,
 				6413BEF22FC6D65100A0F8A4 /* Products */,
 			);
@@ -109,6 +115,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				64FC26A12FCEA34E002CA438 /* .gitignore in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
