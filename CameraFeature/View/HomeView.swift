@@ -7,13 +7,8 @@ struct HomeView: View {
                 Image(systemName: "house.fill")
                     .font(.system(size: 64))
                     .foregroundStyle(.tint)
-
                 Text("Home")
                     .font(.largeTitle.bold())
-
-                Text("Demo main page")
-                    .foregroundStyle(.secondary)
-
                 // Pushes ContentView onto the navigation stack
                 NavigationLink {
                     ContentView()
@@ -27,11 +22,9 @@ struct HomeView: View {
                         .padding(.horizontal, 40)
                 }
             }
-            .navigationTitle("Home")
         }
     }
 }
-
 #Preview {
     HomeView()
 }
